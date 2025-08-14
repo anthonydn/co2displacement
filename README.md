@@ -11,9 +11,10 @@ needed for the analysis are also present.
 	<br>File: sat_site_clean.csv.gz
 
 ## How to run
-1. Download sensor data above from hydroshare
+1. Download sensor data above from hydroshare and auxiliary data files from above.
 2. Ensure all data files and `co2_displacement_figures.Rmd` are in the same folder.
 3. Open `co2_displacement_figures.Rmd` in RStudio.
+
 
 
 
