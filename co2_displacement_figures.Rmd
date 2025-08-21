@@ -35,7 +35,7 @@ theme_no_x <- theme(axis.text.x = element_blank(),
 
 
 ```{r data_import}
-#jornada
+#bajada shrubland
 bajada <- read_csv("sat_site_clean.csv.gz") %>% 
   transmute(DateTime, 
             AirP = `AirP (kPa)`, 
@@ -48,7 +48,7 @@ bajada <- read_csv("sat_site_clean.csv.gz") %>%
 
 tower_precipitation <- read_xlsx("JTower_Precip.xlsx")
 
-#orchard
+#pecan orchard
 combined_fine <- read_csv("pecan_fine_clean.csv.gz") %>% 
   transmute(DateTime, 
             AirP = `pecan_Air_P (kPa)`, 
@@ -70,7 +70,7 @@ rain5r <- read_csv("AboveCanopy_5R_Rainfall.csv") %>%
 R = 8.314 #gas constant
 co2diffusivity = 1.381e-5
 
-#jornada
+#bajada shrubland
 bulk_density = mean(c(1.44, 1.38, 1.64)) # Dacey 2024 thesis 0-15 cm
 porosity = 1 - (bulk_density / 2.71) # porosity = 1 - (bulk density/particle density)
 gastortuosity = 0.66 * (porosity - bajada$VWC_15cm)
@@ -86,7 +86,7 @@ bajada <- bajada %>% mutate(
     ymd_hms("2021-08-28 00:00:00")), lead(SoilT, n = 288), SoilT), 
   CO2_diffusion = -Ds * Dc * ((AirP * 1e3) / ((SoilT + 273.15)) / (R * distance)))
 
-#orchard
+#pecan orchard
 bulk_density_fine = mean(c(1.28, 1.41, 1.33, 1.29, 1.2816, 1.37988)) # Dacey 2024 thesis 0-30 cm
 porosity_fine = 1 - (bulk_density_fine / 2.65)
 gastortuosity_fine = 0.66 * (porosity_fine - combined_fine$VWC_30cm)
@@ -330,6 +330,7 @@ ggplot(aes(DateTime, Flux)) +
   labs(y = expression(atop("Surface Flux (" * italic(F)[CO[2]] * ")",
     mu * "mol m"^"-2" * "s"^"-1")), x = "") +
   theme(panel.border = element_blank())
+
 ```
 
 
@@ -384,22 +385,21 @@ displacement <- function(data, porosity, background_range, pulse_range,
     filter(between(DateTime, pulse_range[1], pulse_range[2]))
   
   background_flux <- mean(background[[chamber]], na.rm = TRUE)
-  vol_CO2 <- (porosity - background[[VWC]]) * (background[[CO2]] / 100)
+  vol_CO2 <- (porosity - background[[VWC]]) * (background[[CO2]] * 1e4)
   Temp_K <- background[[soilT]] + 273.15
   P_atm <- background[[AirP]] / 101.325
 
-  pore_space_co2_ppm <- mean(background[[CO2]], na.rm = TRUE) * 1e4
-  pore_space_co2 <- mean((P_atm * vol_CO2) / (8.205733847e-5 * Temp_K), na.rm = TRUE) * 1e3
-  chamber_pulse_size <- sum(pulse[[chamber]] - background_flux, na.rm = TRUE) * 300 / 1e3
-
+  pore_space_co2 <- mean((P_atm * vol_CO2) / (8.205733847e-5 * Temp_K), na.rm = TRUE)
+  chamber_pulse_size <- sum(pulse[[chamber]] - background_flux, na.rm = TRUE) * 300
+  
   list(
-    `Air-filled pore space proportion` = mean(porosity - background[[VWC]]) %>% round(., 2),
-    `Pore space CO2 (ppm)` = pore_space_co2_ppm %>% round(., 0),
+    `Gas-filled pore space proportion` = mean(porosity - background[[VWC]]) %>% round(., 2),
+    `Pore space CO2 (ppm)` = (mean(background[[CO2]], na.rm = TRUE) * 1e4) %>% round(., 0),
     `Background flux (umol m-2 s-1)` = background_flux %>% round(., 2),
     `Pulse length` = pulse_range[2] - pulse_range[1],
-    `Chamber pulse size (mmol m-2)` = chamber_pulse_size %>% round(., 1),
+    `Chamber pulse size (mmol m-2)` = (chamber_pulse_size / 1000) %>% round(., 1),
     `Depth (cm) at which chamber pulse = pore space CO2` = 
-       ((chamber_pulse_size * 100) / pore_space_co2) %>% round(., 0))
+       ((chamber_pulse_size * 100) / pore_space_co2) %>% round(., 0)) # 100 cm/m
 }
 ```
 
@@ -476,7 +476,7 @@ mutate(`Pulse length` = hms::as_hms(`Pulse length`), Event = rep(1:5, 2)) %>%
 add_column(Pulse = rep(c("ascending", "total"), ea = 5), .after = "Event") %>%
 add_column(`Event size (mm)` = rep(c(8,31,60,39,150), 2), .after = "Pulse") %>%
 mutate(`Max displacement depth (cm)` = round(
-  `Event size (mm)` * 0.1 / `Air-filled pore space proportion`, 0)) %>% 
+  `Event size (mm)` * 0.1 / `Gas-filled pore space proportion`, 0)) %>% 
 kable %>% kable_styling(full_width = FALSE, bootstrap_options = 
   c("striped", "hover", "condensed", "responsive"))
 
@@ -543,5 +543,13 @@ ggplot(aes(DateTime, CO2_diffusion)) +
   theme(panel.border = element_blank(), axis.title.x = element_blank())
 ,
 ncol = 1, align ="hv")
+```
+
+```{r reproducibility}
+# Print reproducibility info into the document
+# See knitted .html in the repository for the session info
+if (requireNamespace("sessioninfo", quietly = TRUE)) {
+  sessioninfo::session_info()} else {
+  sessionInfo()}
 ```
 
